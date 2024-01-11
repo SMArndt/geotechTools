@@ -6,10 +6,8 @@ stlGeom.py
 # imports
 # ---------------------------------------------------------------------------
 
-#from matplotlib.cm import ScalarMappable
 import numpy as np
 import stl
-
 import os
 import time
 
@@ -17,13 +15,7 @@ import time
 # global variables
 # ---------------------------------------------------------------------------
 
-verbose = True
-varIndex = {'id':3,'date':4,'x':0,'y':1,'z':2, \
-            'location residual':5 ,'sensors hit':6, 'sensors used':7 ,'source radius':8 , \
-            'apparent volume':9 ,'seismic moment':10 ,'moment magnitude':11 , \
-            'apparent stress':12 ,'static stress drop':13 ,'dynamic stress drop':14 , \
-            's wave frequency':15 ,'p wave energy':16 ,'s wave energy':17 ,'s:p energy ratio':18 , \
-            'total radiated energy':19 ,'local magnitude':20 ,'p(outlier)':21 }
+verbose = False
 
 # ---------------------------------------------------------------------------
 # functions

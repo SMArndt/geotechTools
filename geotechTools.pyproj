@@ -23,10 +23,16 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="geotechTools.py" />
+    <Compile Include="plot3D.py" />
     <Compile Include="stlGeom.py" />
+    <Compile Include="xyzData.py" />
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="CondaEnv|CondaEnv|conda_np" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="SampleDataset.csv" />
+    <Content Include="SampleMineGeo.stl" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

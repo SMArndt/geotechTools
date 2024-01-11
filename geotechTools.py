@@ -6,15 +6,25 @@ geotechTools.py
 # imports
 # ---------------------------------------------------------------------------
 from stlGeom import stlGeom
+from plot3D import plot3D
+from xyzData import xyzData
 
 # ---------------------------------------------------------------------------
 # example
 # ---------------------------------------------------------------------------
 
-s1 = stlGeom()
-s1.readPath(r'C:\Projects\AMIRA\Objective 1\Mine Geometry STL\Test_Flat', combine=True)
-s1.write(r'C:\Projects\AMIRA\Objective 1\Mine Geometry STL\New_Flat.stl')
+exampleData = r'SampleDataset.csv'
+exampleMine = r'SampleMineGeo.stl'
 
-s2 = stlGeom()
-s2.readPath(r'C:\Projects\AMIRA\Objective 1\Mine Geometry STL\Test_Walk', combine=True)
-s2.write(r'C:\Projects\AMIRA\Objective 1\Mine Geometry STL\New_Walk.stl')
+# ---------------------------------------------------------------------------
+# read CSV file
+# ---------------------------------------------------------------------------
+
+f = xyzData(exampleData)
+
+f.filterIPR(1.0)
+f.filterNaN('local magnitude')
+
+s = stlGeom(exampleMine)
+
+plot3D(f.current, s.stlMesh, 10)
