@@ -7,16 +7,17 @@ plot3D.py
 # ---------------------------------------------------------------------------
 
 import numpy as np
+from stl import mesh
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 
 # ---------------------------------------------------------------------------
-# class plot3D()
+# class plot3Dgeo()
 # ---------------------------------------------------------------------------
 
-class plot3D:
+class plot3Dgeo:
 
-    def __init__(self, points: np.ndarray=None, var=3):
+    def __init__(self, points: np.ndarray=None, stlMesh=None, var=3):
         """
         constructor for plot3D()
         
@@ -31,8 +32,11 @@ class plot3D:
 
         plt_colours = points[:,var]
     
-        fax = ax.scatter(points[:,0],points[:,1],points[:,2], c=plt_colours , vmax=0, cmap=cmap_rainbow)
+        fax = ax.scatter(points[:,0],points[:,1],points[:,2], c=plt_colours , cmap=cmap_rainbow)
 
+        if stlMesh:
+            your_mesh = stlMesh
+            ax.add_collection3d(mplot3d.art3d.Poly3DCollection(your_mesh.vectors))
 
         ax.set_xlabel('X')
         ax.set_ylabel('Y')

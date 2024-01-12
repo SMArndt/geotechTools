@@ -24,6 +24,7 @@
   <ItemGroup>
     <Compile Include="geotechTools.py" />
     <Compile Include="plot3D.py" />
+    <Compile Include="plot3Dgeo.py" />
     <Compile Include="stlGeom.py" />
     <Compile Include="xyzData.py" />
   </ItemGroup>
