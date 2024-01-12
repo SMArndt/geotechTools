@@ -24,14 +24,15 @@ class plot3D:
         """
 
         # https://matplotlib.org/stable/gallery/color/colormap_reference.html
-        cmap_rainbow = 'rainbow'
+        #usescientificcolourmaps suggested by https://www.linkedin.com/in/lindsey-smith-17665622a/
+        cmaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis'][2]
 
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
 
         plt_colours = points[:,var]
     
-        fax = ax.scatter(points[:,0],points[:,1],points[:,2], c=plt_colours , vmax=0, cmap=cmap_rainbow)
+        fax = ax.scatter(points[:,0],points[:,1],points[:,2], c=plt_colours , vmax=0, cmap=cmaps)
 
 
         ax.set_xlabel('X')
