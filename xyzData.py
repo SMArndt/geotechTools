@@ -7,6 +7,7 @@ xyzData.py
 # ---------------------------------------------------------------------------
 
 import numpy as np
+from scipy.spatial import KDTree
 import time
 import csv
 
@@ -63,16 +64,16 @@ class xyzData:
         self.current=[] # current data set (filtered), np.array()
         self.bBox=[]    # current data bounding box
 
-        self.index = \
-            {'id':3,'date':4,'x':0,'y':1,'z':2}
+        self.index = {'x':0,'y':1,'z':2} # index storing self.pData
+        
         self.exclude = \
-            ['apparent stress', 'static stress drop' ,'dynamic stress drop' , \
+            ['id','date','location residual','apparent stress', 'static stress drop' ,'dynamic stress drop' , \
              's wave frequency' ,'p wave energy' ,'s wave energy' ,'s:p energy ratio' , \
              'total radiated energy' ,'p(outlier)'] \
              + list(self.index.keys()) 
 
-        self.csvCol = {}
-        self.maxCol = 0
+        self.csvCol={}  # origin column in csv file
+        self.maxCol=0   # max column index saved in pData - shape is (N,maxCol+1)
         
         if self.fileName==None:
             pass
@@ -176,9 +177,12 @@ class xyzData:
         """
         method to filter outliers using interpercentile range p_IPR = (0,50)
         """
-
+        l0 = len(self.current)
         self.current = array3D_IPR(self.pData, p_IPR)
         self.bBox = array3D_BBox(self.current)
+        
+        if verbose:
+            print (f"filterIPR ({p_IPR}%-{100-p_IPR}%) removed {l0-len(self.current)} lines")
         
         return self.current
         
@@ -228,3 +232,90 @@ class xyzData:
         return self.current
         
     # ~filterBBox(self):
+
+    def extractArrayN4(self, col):
+        """
+        method to extract np.array of shape (N, 4)
+        
+        arguments:
+        -col integer: index / string: key for self.index[]
+        """
+
+        if isinstance(col,str):
+            try:
+                colStr=col
+                col=self.index[colStr]
+            except:
+                print(f"extractArrayN4: '{col}' not found in self.index")
+                return
+            
+        return np.hstack((self.current[:,0:3],self.current[:,col].reshape(-1,1)))
+    
+    # ~extractArrayN4(self, col)
+
+    def mapData(self, source, newIndex='mapData-1', overwrite=True, maxDist=False, fill=np.nan):
+        """
+        method to map data from source to self using kdTree
+        - one column from np.array of shape (N, 4) into newIndex
+        - all columns from xyzData class object with new indices from source.index
+        """
+        
+        # source data
+        # -----------
+        if isinstance(source,np.ndarray):
+            sourceData = source
+        elif isinstance(source,xyzData):
+            sourceData = source.current
+        else:
+            return
+        
+        # target data
+        # -----------
+        targetData = self.current
+        
+        # kdTree
+        # ------
+        kdtree=KDTree(sourceData[:,0:3])
+        dist,points=kdtree.query(targetData[:,0:3],1) # for ,2: points[i] becomes list
+
+        if isinstance(source,np.ndarray): # map one column only
+
+            if newIndex in self.index.keys():
+                targetCol = self.index[newIndex]
+            else:
+                targetCol = self.maxCol+1
+                self.index[newIndex]=targetCol
+                overwrite=True
+            if overwrite:
+                # create new column with zeros
+                targetData = np.hstack([targetData,np.zeros([len(targetData),1])])
+    
+                for i in range(len(points)):
+                    if (maxDist is False) or (dist[i]<=maxDist):
+                        targetData[i,targetCol]=sourceData[points[i],3]
+                    else:
+                        targetData[i,targetCol]=fill
+
+        elif isinstance(source,xyzData): # map all columns
+
+            # create new columns with zeros     
+            for col in source.index.keys():
+                if col not in self.index.keys():
+                    self.maxCol+=1
+                    self.index[col]=self.maxCol
+                    targetData = np.hstack([targetData,np.zeros([len(targetData),1])])
+            # map data
+            for i in range(len(points)):    
+                for col in source.index.keys():
+                    if col not in ['x','y','z']:
+                        if (col not in self.index.keys()) or overwrite:
+                            if (maxDist is False) or (dist[i]<=maxDist):
+                                targetData[i,self.index[col]]=sourceData[points[i],source.index[col]]
+                            else:
+                                targetData[i,self.index[col]]=fill  
+        else:
+            return
+
+        self.current = targetData
+
+    # ~def mapData(self, source, newIndex='mapData-1')
