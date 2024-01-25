@@ -1,5 +1,18 @@
 """
-stlGeom.py
+stlGeom.py - Copyright 2024 S.M.Arndt, Cavroc Pty Ltd
+Visit https://cavroc.com/ for more information on IUCM and StopeX
+
+This file is part of geotechTools (https://github.com/SMArndt/geotechTools).
+
+geotechTools is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software Foundation.
+
+geotechTools is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with geotechTools.
+If not, see <https://www.gnu.org/licenses/>.
 """
 
 # ---------------------------------------------------------------------------
