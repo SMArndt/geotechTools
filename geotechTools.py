@@ -25,37 +25,23 @@ If not, see <https://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------------------
 # imports
 # ---------------------------------------------------------------------------
-from xyzData import xyzData
-from plot3D import plot3D
+
+from xyzData import *
+from gridData import *
+from plot3D import *
 
 # ---------------------------------------------------------------------------
 # example: read CSV file
 # ---------------------------------------------------------------------------
 
 f = xyzData(r'SampleDataset.csv')
+f.filterIPR(1.0)
+f.filterNaN('local magnitude')
+plot3D(f.current,f.index['local magnitude'])
 
 # ---------------------------------------------------------------------------
-# mapData() example: mapping of 'colour-xz' from random points to exampleData
+# create grid with cell size 50m
 # ---------------------------------------------------------------------------
 
-g = xyzData(r'random_colour.csv')
-plot3D(g.current,g.index['colour-yz'])
-
-f.mapData(g)
-plot3D(f.current,f.index['colour-yz'])
-
-# ---------------------------------------------------------------------------
-# optional: STL geometry, requires manual install of numpy-stl package
-# ---------------------------------------------------------------------------
-
-# exampleMine = r'SampleMineGeo.stl'
-
-# from stlGeom import stlGeom
-# from plot3Dgeo import plot3Dgeo
-
-# s = stlGeom(exampleMine)
-
-# f.filterIPR(1.0)
-# f.filterNaN('local magnitude')
-
-# plot3Dgeo(f.current, s.stlMesh, f.index['local magnitude'])
+g = gridData(f.current, cellSize=50.)
+plot3DVoxel(g)

@@ -23,8 +23,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="geotechTools.py" />
+    <Compile Include="gridData.py" />
     <Compile Include="plot3D.py" />
-    <Compile Include="plot3Dgeo.py" />
     <Compile Include="stlGeom.py" />
     <Compile Include="xyzData.py" />
   </ItemGroup>
@@ -32,6 +32,7 @@
     <InterpreterReference Include="CondaEnv|CondaEnv|conda_np" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="gridData_geotechTools.ipynb" />
     <Content Include="SampleDataset.csv" />
     <Content Include="SampleMineGeo.stl" />
   </ItemGroup>
