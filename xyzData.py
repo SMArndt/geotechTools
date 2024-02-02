@@ -19,16 +19,12 @@ If not, see <https://www.gnu.org/licenses/>.
 # imports
 # ---------------------------------------------------------------------------
 
-import numpy as np
-from scipy.spatial import KDTree
 import time
 import csv
+import config
 
-# ---------------------------------------------------------------------------
-# global variables
-# ---------------------------------------------------------------------------
-
-verbose = True
+import numpy as np
+from scipy.spatial import KDTree
 
 # ---------------------------------------------------------------------------
 # functions
@@ -114,7 +110,7 @@ class xyzData:
             
             for row in csv_reader:
                 if i==0: # headers
-                    if verbose: print ("reading column headers ...")
+                    if config.verbose: print ("reading column headers ...")
 
                     # listed headers, save j in dictionary & update maxCol
                     j=0
@@ -124,6 +120,10 @@ class xyzData:
                         if csv_col in self.index.keys():
                             self.csvCol[csv_col]=j
                             self.maxCol=max(self.maxCol,self.index[csv_col])
+
+                            if config.verbose:
+                                print (csv_col, "listed in column", self.csvCol[csv_col], \
+                                       "stored in", self.index[csv_col] )
                         j+=1
 
                     # unlisted headers, locate next available slot
@@ -141,6 +141,10 @@ class xyzData:
                             self.index[csv_col]=nextIndex[0] # next available slot
                             self.maxCol=max(self.maxCol,self.index[csv_col])
                             nextIndex.remove(nextIndex[0])
+
+                            if config.verbose:
+                                print (csv_col, "unlisted in column", self.csvCol[csv_col], \
+                                       "stored in", self.index[csv_col] )
                         j+=1
                         
                     # avoid repeat lookup
@@ -175,7 +179,7 @@ class xyzData:
                         self.pData.append(np.array(rowData))
                 i+=1
 
-        if verbose:
+        if config.verbose:
             print (f"time: {time.time()-t0} seconds")
             print (f"{i} Lines, {self.maxCol+1} columns")
             print (f"invalid data in {k} lines")
@@ -183,6 +187,7 @@ class xyzData:
         self.pData = np.vstack(self.pData)
 
         self.current = self.pData
+        self.bBox = array3D_BBox(self.current)
             
     # ~read(self, fileName)
 
@@ -194,7 +199,7 @@ class xyzData:
         self.current = array3D_IPR(self.pData, p_IPR)
         self.bBox = array3D_BBox(self.current)
         
-        if verbose:
+        if config.verbose:
             print (f"filterIPR ({p_IPR}%-{100-p_IPR}%) removed {l0-len(self.current)} lines")
         
         return self.current
@@ -214,12 +219,13 @@ class xyzData:
                 colStr=col
                 col=self.index[colStr]
             except:
-                return
+                print (f'{colStr} not in source index')
+                raise TypeError
             
         l0 = len(self.current)
         self.current = self.current[np.isfinite(self.current[:,col])]
  
-        if verbose: print (f"filterNaN '{colStr}' [{col}] removed {l0-len(self.current)} lines")
+        if config.verbose: print (f"filterNaN '{colStr}' [{col}] removed {l0-len(self.current)} lines")
 
         self.bBox = array3D_BBox(self.current)
         return self.current
@@ -239,7 +245,7 @@ class xyzData:
             (self.current[:,1] > y0) & (self.current[:,1] < y1) & \
             (self.current[:,2] > z0) & (self.current[:,2] < z1) )]
 
-        if verbose: print (f"filterBBox {bBox} offset {offset} removed {l0-len(self.current)} lines")
+        if config.verbose: print (f"filterBBox {bBox} offset {offset} removed {l0-len(self.current)} lines")
             
         self.bBox = array3D_BBox(self.current)
         return self.current
@@ -248,7 +254,7 @@ class xyzData:
 
     def extractArrayN4(self, col):
         """
-        method to extract np.array of shape (N, 4)
+        method to extract np.array() of shape (N, 4)
         
         arguments:
         -col integer: index / string: key for self.index[]
@@ -265,6 +271,35 @@ class xyzData:
         return np.hstack((self.current[:,0:3],self.current[:,col].reshape(-1,1)))
     
     # ~extractArrayN4(self, col)
+
+    def extractStress(self, indices='default', xyz=False):
+        """
+        method to extract np.array() of shape (N, 6) or (N, 9) if xyz=True
+        
+        arguments:
+        -indices:       stress column notation
+        -xyz boolean:   True if xyz stress components are in array[0:2]
+        """
+        
+        if indices=='default' or indices=='xyz':
+            col=['sxx','syy', 'szz', 'sxy','sxz', 'syz']
+        if indices=='123':
+            col=['s11','s22', 's33', 's12','s13', 's23']
+        
+        for i in range(6):
+            try:
+                col[i]=self.index[col[i]]
+            except:
+                print(f"extractStress: '{col[i]}' not found in self.index")
+                return
+
+        if xyz:
+            return np.hstack((self.current[:,0:3], \
+                   np.hstack([self.current[:,col[i]].reshape(-1, 1) for i in range(6)])))
+        else:
+            return np.hstack([self.current[:,col[i]].reshape(-1, 1) for i in range(6)])
+
+    # ~extractStress()
 
     def mapData(self, source, newIndex='mapData-1', overwrite=True, maxDist=False, fill=np.nan):
         """

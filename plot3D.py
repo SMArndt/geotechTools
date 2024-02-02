@@ -25,12 +25,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 from gridData import *
-
-# ---------------------------------------------------------------------------
-# global variables
-# ---------------------------------------------------------------------------
-
-verbose = False
+import config
 
 # ---------------------------------------------------------------------------
 # class plot3DVoxel()
@@ -114,7 +109,7 @@ class plot3DVoxel:
 
 class plot3D:
 
-    def __init__(self, points: np.ndarray, var, elev=12.5, azim=-22.5):
+    def __init__(self, points: np.ndarray, var, vmin=None, vmax=None, elev=12.5, azim=-22.5):
         """
         constructor for plot3D()
         """
@@ -127,7 +122,7 @@ class plot3D:
 
         plt_colours = points[:,var]
     
-        fax = ax.scatter(points[:,0],points[:,1],points[:,2], c=plt_colours , cmap=cmaps)
+        fax = ax.scatter(points[:,0],points[:,1],points[:,2], vmin=vmin, vmax=vmax, c=plt_colours , cmap=cmaps)
 
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
@@ -144,7 +139,7 @@ class plot3D:
         plt.colorbar(fax)
         plt.show()
 
-        if verbose:
+        if config.verbose:
             print(f"elev {ax.elev}, azim {ax.azim}")
             
     # ~def __init__()

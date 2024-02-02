@@ -19,16 +19,12 @@ If not, see <https://www.gnu.org/licenses/>.
 # imports
 # ---------------------------------------------------------------------------
 
-import numpy as np
 import stl
 import os
 import time
+import config
 
-# ---------------------------------------------------------------------------
-# global variables
-# ---------------------------------------------------------------------------
-
-verbose = False
+import numpy as np
 
 # ---------------------------------------------------------------------------
 # functions
@@ -85,7 +81,7 @@ class stlGeom:
         t0 = time.time()
         self.stlMesh = stl.mesh.Mesh.from_file(fileName)
         
-        if verbose:
+        if config.verbose:
             print (f"time: {time.time()-t0} seconds")
             
         self.minMax()
@@ -106,7 +102,7 @@ class stlGeom:
         t0 = time.time()
 
         for osFolder, osSubfolders, osFilenames in os.walk(pathName):
-            if verbose:
+            if config.verbose:
                 print(f"Reading {osFolder}")
             for osFilename in osFilenames:
                 if combine and self.bBox:
@@ -115,7 +111,7 @@ class stlGeom:
                 if os.path.splitext(osFilename)[1]=='.stl':
                     try:
                         self.stlMesh=stl.mesh.Mesh.from_file(os.path.join(osFolder,osFilename))
-                        if verbose: print(f"... success reading {osFilename}")
+                        if config.verbose: print(f"... success reading {osFilename}")
 
                         # update bounding box
                         if self.bBox:
@@ -139,7 +135,7 @@ class stlGeom:
         if not combine:
             self.stlMesh = None
         
-        if verbose:
+        if config.verbose:
             print (f"time: {time.time()-t0} seconds")
             print (self.bBox)
 
@@ -162,7 +158,7 @@ class stlGeom:
 
         if self.stlMesh:
             self.stlMesh.save(fileName, mode=stl.Mode.ASCII)
-            if verbose:
+            if config.verbose:
                 print (f"saved: {fileName}")
         else:
             print (f"no mesh to save")

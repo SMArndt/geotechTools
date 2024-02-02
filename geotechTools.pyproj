@@ -33,6 +33,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="gridData_geotechTools.ipynb" />
+    <Content Include="random_colour.csv" />
+    <Content Include="regular_stress.csv" />
     <Content Include="SampleDataset.csv" />
     <Content Include="SampleMineGeo.stl" />
   </ItemGroup>

@@ -31,17 +31,24 @@ from gridData import *
 from plot3D import *
 
 # ---------------------------------------------------------------------------
-# example: read CSV file
+# example: read stress from file, perform eigenvalue analysis, plot S1
 # ---------------------------------------------------------------------------
 
-f = xyzData(r'SampleDataset.csv')
-f.filterIPR(1.0)
-f.filterNaN('local magnitude')
-plot3D(f.current,f.index['local magnitude'])
+# read x,y,z data with stress columns
+x = xyzData(r'regular_stress.csv')
+print(x.index)
 
-# ---------------------------------------------------------------------------
-# create grid with cell size 50m
-# ---------------------------------------------------------------------------
+# extract stress components using the new method extractStress()
+stress=x.extractStress(indices='xyz')
 
-g = gridData(f.current, cellSize=50.)
-plot3DVoxel(g)
+# perform eigenvalue analysis
+eigens=[]
+for s in stress:
+    T=np.array([[s[0],s[3],s[4]],[s[3],s[1],s[5]],[s[4],s[5],s[2]]])
+    e_val, e_vec = np.linalg.eig(T)
+    e_val.sort()
+    eigens.append(e_val[0]) # S1
+
+# quick way to plot S1 (in last column, t.shape[1]-1)
+t=np.hstack((x.current,np.array(eigens).reshape(-1,1)))
+plot3D(t,t.shape[1]-1)
