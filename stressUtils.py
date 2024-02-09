@@ -69,12 +69,12 @@ def getCartesianStress(Principals):
     """
     
     Cartesian = np.zeros((3,3))                      
-    for(value,dip,trend) in Principals:
+    for(value,plunge,trend) in Principals:
     
         T=np.array([[0,0,0],[0,value,0],[0,0,0]])
 
-        # rotation matrix R = Rz(-trend) * Rx(-dip)
-        R = np.dot(rot_z(math.radians(-trend)), rot_x(math.radians(-dip)))
+        # rotation matrix R = Rz(-trend) * Rx(-plunge)
+        R = np.dot(rot_z(math.radians(-trend)), rot_x(math.radians(-plunge)))
         # rotated tensor R * T * R.T
         T = np.dot(np.dot(R, T), R.T)
     
