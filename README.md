@@ -6,3 +6,5 @@ Python gridData in geotechTools
 https://www.linkedin.com/pulse/python-griddata-geotechtools-stephan-arndt-kfrkc  
 Don't stress, use Python
 https://www.linkedin.com/pulse/dont-stress-use-python-stephan-arndt-aycoc
+Principal Stress Transformations
+https://www.linkedin.com/pulse/principal-stress-transformations-stephan-arndt-e7jbc
