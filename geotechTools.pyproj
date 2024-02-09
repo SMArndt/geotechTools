@@ -26,6 +26,7 @@
     <Compile Include="gridData.py" />
     <Compile Include="plot3D.py" />
     <Compile Include="stlGeom.py" />
+    <Compile Include="stressUtils.py" />
     <Compile Include="xyzData.py" />
   </ItemGroup>
   <ItemGroup>

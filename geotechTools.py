@@ -29,6 +29,7 @@ If not, see <https://www.gnu.org/licenses/>.
 from xyzData import *
 from gridData import *
 from plot3D import *
+from stressUtils import *
 
 # ---------------------------------------------------------------------------
 # example: read stress from file, perform eigenvalue analysis, plot S1
@@ -44,10 +45,11 @@ stress=x.extractStress(indices='xyz')
 # perform eigenvalue analysis
 eigens=[]
 for s in stress:
-    T=np.array([[s[0],s[3],s[4]],[s[3],s[1],s[5]],[s[4],s[5],s[2]]])
-    e_val, e_vec = np.linalg.eig(T)
-    e_val.sort()
+    T=unpackStress(s)                    # new method unpackStress()
+    e_val, e_vec = getPrincipalStress(T) # new method getPrincipalStress()
     eigens.append(e_val[0]) # S1
+
+orientations=getStressOrientation(e_vec) # new method getStressOrientation()
 
 # quick way to plot S1 (in last column, t.shape[1]-1)
 t=np.hstack((x.current,np.array(eigens).reshape(-1,1)))
