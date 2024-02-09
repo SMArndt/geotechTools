@@ -23,7 +23,9 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import matplotlib
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
+from stressUtils import rot_x, rot_y, rot_z
 from gridData import *
 import config
 
@@ -146,6 +148,82 @@ class plot3D:
 
     def __str__(self):
         return f"plot3D"
+
+# ---------------------------------------------------------------------------
+# class plot3DCube()
+# ---------------------------------------------------------------------------
+
+class plot3DCube:
+    
+    def __init__(self, dip, trend):
+        """
+        constructor for plot3DCube() 
+        
+        plots a rotated cube (dip and trend) and a reference cube
+        """
+        vertices=True
+
+        # define a cube (nodes and faces)
+        cNodes=[[0.,0.,0.],[1.,0.,0.],[1.,1.,0.],[0.,1.,0.],[0.,0.,1.],[1.,0.,1.],[1.,1.,1.],[0.,1.,1.]]
+        cFaces=[(0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)]
+
+        cNodes=np.array(cNodes)
+        pNodes=np.array(cNodes)
+
+        # rotation of the cube around center (0.5,0.5,0.5)
+        R1 = rot_z(np.radians(-trend))
+        R2 = rot_x(np.radians(-dip))
+        R = np.dot(R1,R2)
+        for i in range(len(cNodes)):
+            pNodes[i]=np.dot(R,cNodes[i]-[0.5,0.5,0.5])+[0.5,0.5,0.5]
+
+        # create plot
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # create list of edges and faces
+        fList=[]
+        for f in cFaces:
+            fList.append([cNodes[f[0]],cNodes[f[1]],cNodes[f[2]],cNodes[f[3]]])
+        
+        eList=[]
+        for f in cFaces:
+            for i in range(4):
+                if (f[i]<f[(i+1)%4]):
+                    eList.append([cNodes[f[i]],cNodes[f[(i+1)%4]]])
+
+        # plot edges
+        for e in eList:
+            ax.plot([e[0][0],e[1][0]],[e[0][1],e[1][1]],[e[0][2],e[1][2]],'k-')
+ 
+        # plot faces
+        faces = Poly3DCollection(fList, alpha=0.05)
+        faces.set_facecolor('k')
+        ax.add_collection3d(faces)
+
+        # plot rotated cube
+        eList=[]
+        for f in cFaces:
+            for i in range(4):
+                if (f[i]<f[(i+1)%4]):
+                    eList.append([pNodes[f[i]],pNodes[f[(i+1)%4]]])
+        # plot edges
+        for e in eList:
+            ax.plot([e[0][0],e[1][0]],[e[0][1],e[1][1]],[e[0][2],e[1][2]],'k-')
+
+        # color faces for each orientation (x,y,z)
+        orientations = [['r',5],['g',2],['b',0]]
+        for o in orientations:
+            f=cFaces[o[1]]
+            fList=[[pNodes[f[0]],pNodes[f[1]],pNodes[f[2]],pNodes[f[3]]]]
+            faces = Poly3DCollection(fList, alpha=0.75)
+            faces.set_facecolor(o[0])
+            ax.add_collection3d(faces)
+
+        ax.set_aspect('equal')
+        plt.show()
+
+    # ~def __init__()
 
 # ---------------------------------------------------------------------------
 # class plot3Dgeo() - requires stl, a non-standard package: pip install numpy-stl

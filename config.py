@@ -6,4 +6,4 @@ config.py
 # global settings
 # ---------------------------------------------------------------------------
 
-verbose = True
+verbose = False

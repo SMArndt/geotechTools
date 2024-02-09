@@ -51,7 +51,7 @@ def rot_z(theta):
 
 def unpackStress(s):
     """
-    returns np.array(3,3) from stress s = [Sxx,Syy, Szz, Sxy,Sxz,Syz]
+    returns np.array(3,3) from stress s = [Sxx,Syy,Szz,Sxy,Sxz,Syz]
     """
     return np.array([[s[0],s[3],s[4]],[s[3],s[1],s[5]],[s[4],s[5],s[2]]])
 

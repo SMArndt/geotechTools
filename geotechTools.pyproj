@@ -22,6 +22,7 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="config.py" />
     <Compile Include="geotechTools.py" />
     <Compile Include="gridData.py" />
     <Compile Include="plot3D.py" />
@@ -34,6 +35,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="gridData_geotechTools.ipynb" />
+    <Content Include="principals_geotechTools.ipynb" />
     <Content Include="random_colour.csv" />
     <Content Include="regular_stress.csv" />
     <Content Include="SampleDataset.csv" />
