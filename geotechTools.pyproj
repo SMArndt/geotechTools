@@ -34,6 +34,7 @@
     <InterpreterReference Include="CondaEnv|CondaEnv|conda_np" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="geotechTools.ipynb" />
     <Content Include="gridData_geotechTools.ipynb" />
     <Content Include="mapData_geotechTools.ipynb" />
     <Content Include="principals_geotechTools.ipynb" />
