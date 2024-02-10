@@ -35,6 +35,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="gridData_geotechTools.ipynb" />
+    <Content Include="mapData_geotechTools.ipynb" />
     <Content Include="principals_geotechTools.ipynb" />
     <Content Include="random_colour.csv" />
     <Content Include="regular_stress.csv" />
