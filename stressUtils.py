@@ -1,24 +1,3 @@
-"""
-stressUtils.py - Copyright 2024 S.M.Arndt, Cavroc Pty Ltd
-Visit https://cavroc.com/ for more information on IUCM and StopeX
-
-This file is part of geotechTools (https://github.com/SMArndt/geotechTools).
-
-geotechTools is free software: you can redistribute it and/or modify it under the
-terms of the GNU General Public License as published by the Free Software Foundation.
-
-geotechTools is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with geotechTools.
-If not, see <https://www.gnu.org/licenses/>.
-"""
-
-# ---------------------------------------------------------------------------
-# imports
-# ---------------------------------------------------------------------------
-
 import numpy as np
 import math
 
@@ -51,7 +30,7 @@ def rot_z(theta):
 
 def unpackStress(s):
     """
-    returns np.array(3,3) from stress s = [Sxx,Syy,Szz,Sxy,Sxz,Syz]
+    returns np.array(3,3) from stress s = [Sxx,Syy, Szz, Sxy,Sxz,Syz]
     """
     return np.array([[s[0],s[3],s[4]],[s[3],s[1],s[5]],[s[4],s[5],s[2]]])
 
@@ -118,3 +97,33 @@ def getPlaneOrientation(normal):
     ddir = (math.degrees(math.atan2(normal[0]*sign,normal[1]*sign))+360)%360
 
     return (dip,ddir)
+
+def getNormalsTrig(DipDDList):
+    """
+    returns normal vectors for each dip and direction, from excel template, identical to getNormals()
+    """
+    
+    normals=[]
+    for dip,ddir in DipDDList:
+        # calculate normal vector
+        normal = np.array([math.cos(math.radians(dip))*math.sin(math.radians(ddir)), \
+                           math.cos(math.radians(dip))*math.cos(math.radians(ddir)), \
+                           -math.sin(math.radians(dip))])
+        normals.append(normal)
+    
+    return normals
+
+def getNormals(DipDDList):
+    """
+    returns normal vectors for each dip and direction using rotation matrices, identical to getNormalsTrig()
+    """
+    
+    normals=[]
+    for dip,ddir in DipDDList:
+    
+        # rotation matrix R = Rz(-ddir) * Rx(-dip)
+        R = np.dot(rot_z(math.radians(-ddir)), rot_x(math.radians(-dip)))
+        # rotated vector R * v
+        normals.append(np.dot(R, (0.,1.,0)))
+    
+    return normals
