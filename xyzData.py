@@ -20,11 +20,15 @@ If not, see <https://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------------------
 
 import time
+from datetime import datetime
 import csv
 import config
 
 import numpy as np
+import pandas as pd
+
 from scipy.spatial import KDTree
+from stressUtils import *
 
 # ---------------------------------------------------------------------------
 # functions
@@ -34,14 +38,28 @@ def array3D_BBox(a):
     """
     bounding box of np.array() of shape (N, 3 or more) with a[,0],[,1],[,2] = x,y,z
     
-    returns tuple ((x0,y0,z0),(x1,y1,z1))
+    arguments:
+    -a: np.array()
+    
+    returns: tuple ((x0,y0,z0),(x1,y1,z1))
     """
     
-    return ((min(a[:,0]), min(a[:,1]), min(a[:,2])), (max(a[:,0]), max(a[:,1]), max(a[:,2])))
+    if a.shape[0] > 0:
+        return ((min(a[:,0]), min(a[:,1]), min(a[:,2])), (max(a[:,0]), max(a[:,1]), max(a[:,2])))
+    else:
+        return False
+
+# ~def array3D_BBox(a)
 
 def array3D_IPR(a, p_IPR=25.0):
     """
     filter in interpercentile range of np.array() of shape (N, 3 or more)
+    
+    arguments:
+    -a: np.array()
+    -p_IPR: float, interpercentile range (0,50)
+    
+    returns: np.array() of a.shape
     """
     
     xyz_pmin, xyz_pmax = p_IPR, 100 - p_IPR # symmetric interpercentile range
@@ -56,6 +74,8 @@ def array3D_IPR(a, p_IPR=25.0):
         (a[:,1] > p_limits[1][0]) & (a[:,1] < p_limits[1][1]) & \
         (a[:,2] > p_limits[2][0]) & (a[:,2] < p_limits[2][1]) )]
 
+# ~def array3D_IPR(a, p_IPR=25.0)
+
 # ---------------------------------------------------------------------------
 # class xyzData()
 # ---------------------------------------------------------------------------
@@ -65,28 +85,24 @@ class xyzData:
     def __init__(self, fileName=None):
         """
         constructor for xyzData()
+        class for np.array(dtype=float) with required columns x,y,z in [0,1,2]
+        all string columns from csv file need interpretation methods, i.e. date
+        
+        arguments:
+        -fileName:      (optional) argument fileName will invoke read() method
         """
 
-        self.fileName = fileName
-
-        self.pData=[]   # raw data set, np.array()
-        self.current=[] # current data set (filtered), np.array()
-        self.bBox=[]    # current data bounding box
-
-        self.index = {'x':0,'y':1,'z':2} # index storing self.pData
+        self.fileName = fileName    # self explanatory
+        self.pData = np.array([])   # raw data set, np.array()
+        self.current = np.array([]) # current data set (filtered), np.array()
         
-        self.exclude = \
-            ['id','date','location residual','apparent stress', 'static stress drop' ,'dynamic stress drop' , \
-             's wave frequency' ,'p wave energy' ,'s wave energy' ,'s:p energy ratio' , \
-             'total radiated energy' ,'p(outlier)'] \
-             + list(self.index.keys()) 
-
-        self.csvCol={}  # origin column in csv file
-        self.maxCol=0   # max column index saved in pData - shape is (N,maxCol+1)
+                                    # current data bounding box ... nerd alert
+        self.bBox = ((-np.inf,-np.inf,-np.inf),(np.inf,np.inf,np.inf))
+        self.maxCol = 0             # max column index saved in pData - shape is (N,maxCol+1)
+        self.dateCol = False
+        self.stepCol = False
         
-        if self.fileName==None:
-            pass
-        else:
+        if not(self.fileName==None):
             self.read(self.fileName)
 
     # ~def __init__(self, fileName=None)
@@ -94,14 +110,47 @@ class xyzData:
     def __str__(self):
         return f"{self.fileName}, {len(self.pData)} Lines, {len(self.current)} current Points"
 
-    def read(self, fileName):
+    def read(self, fileName, xyzCol=['x','y','z'], dateCol='Date', dateFormat='iso-8601', \
+             limit=None, rmCRLF=True):
         """
         method to read xyzData
+        
+        arguments:
+        -fileName:      string, csv file name
+        -xyzCol:        list of strings, column names for x,y,z
+        -dateCol:       string, column name for date
+        -limit:         integer, limit number of lines
+        -rmCRLF:        boolean, remove CRLF from csv file
         """
 
-        self.fileName=fileName
-        self.maxCol = 0
+        self.fileName = fileName
+        pDataArray = []   # raw data set, np.array()
+
+        # argument xyzCol can be string or list (catch copy paste)
+        if isinstance(xyzCol,str): xyzCol=xyzCol.split(',')
+        elif isinstance(xyzCol,list) and len(xyzCol)==1: xyzCol=xyzCol[0].split(',')
+        elif isinstance(xyzCol,list) and len(xyzCol)==3:pass
+        else:
+            print (f"xyzCol {xyzCol} not valid")
+            raise ValueError
+
+        # index for listed entries in pData with mandatory x,y,z in [0,1,2]
+        self.index = {xyzCol[0]:0,xyzCol[1]:1,xyzCol[2]:2}
+        if config.verbose:
+            print ("xyz columns are: ", "x:", xyzCol[0], "y:", xyzCol[1], "z:", xyzCol[2])
         
+        # optional excluded columns from csv file
+        self.exclude = \
+            ['id','date','location residual','apparent stress', 'static stress drop' ,'dynamic stress drop' , \
+             's wave frequency' ,'p wave energy' ,'s wave energy' ,'s:p energy ratio' , \
+             'total radiated energy' ,'p(outlier)'] \
+             + list(self.index.keys()) 
+
+        self.dateCol = dateCol      # date column name
+        self.xyzCol = xyzCol        # x,y,z column names
+        self.csvCol = {}            # origin column in csv file
+        self.maxCol = 0             # max column index saved in pData - shape is (N,maxCol+1)
+
         t0 = time.time()
         with open(fileName, newline='') as csvfile:
             csv_reader = csv.reader(csvfile, delimiter=',', quotechar='"') # defaults
@@ -112,32 +161,50 @@ class xyzData:
                 if i==0: # headers
                     if config.verbose: print ("reading column headers ...")
 
-                    # listed headers, save j in dictionary & update maxCol
-                    j=0
+                    # listed headers, save currentCol in dictionary & update maxCol
+                    currentCol=0
                     for csv_col_head in row:
-                        # current column is j
-                        csv_col = csv_col_head.lower() 
+                        if rmCRLF:
+                            # remove leading spaces, replace CRLF with space, remove double spaces
+                            csv_col = csv_col_head.lstrip().replace('\r\n', ' ').replace('  ', ' ')
+                        else:
+                            # remove leading spaces
+                            csv_col = csv_col_head.lstrip()
+
+                        # lower case headers for 'x','y','z'
+                        if csv_col in ['X','Y','Z']: csv_col=csv_col.lower()
+
                         if csv_col in self.index.keys():
-                            self.csvCol[csv_col]=j
+                            self.csvCol[csv_col]=currentCol
                             self.maxCol=max(self.maxCol,self.index[csv_col])
 
                             if config.verbose:
                                 print (csv_col, "listed in column", self.csvCol[csv_col], \
                                        "stored in", self.index[csv_col] )
-                        j+=1
+                        currentCol+=1
 
-                    # unlisted headers, locate next available slot
+                    # unlisted headers, locate available slots
                     listed=[]
                     for j in self.index: listed.append(self.index[j])
                     nextIndex = list(range(len(row)))
                     for j in listed: nextIndex.remove(j)
                     nextIndex.sort()
 
-                    j=0                    
+                    # unlisted headers, save currentCol in dictionary & update maxCol
+                    currentCol=0                    
                     for csv_col_head in row:
-                        csv_col = csv_col_head.lower() 
+                        if rmCRLF:
+                            # remove leading spaces, replace CRLF with space, remove double spaces
+                            csv_col = csv_col_head.lstrip().replace('\r\n', ' ').replace('  ', ' ')
+                        else:
+                            # remove leading spaces
+                            csv_col = csv_col_head.lstrip()
+                        
+                        # lower case headers for 'x','y','z'
+                        if csv_col in ['X','Y','Z']: csv_col=csv_col.lower()
+
                         if csv_col not in self.exclude:
-                            self.csvCol[csv_col]=j
+                            self.csvCol[csv_col]=currentCol
                             self.index[csv_col]=nextIndex[0] # next available slot
                             self.maxCol=max(self.maxCol,self.index[csv_col])
                             nextIndex.remove(nextIndex[0])
@@ -145,12 +212,12 @@ class xyzData:
                             if config.verbose:
                                 print (csv_col, "unlisted in column", self.csvCol[csv_col], \
                                        "stored in", self.index[csv_col] )
-                        j+=1
+                        currentCol+=1
                         
                     # avoid repeat lookup
-                    xpos = self.csvCol['x']
-                    ypos = self.csvCol['y']
-                    zpos = self.csvCol['z']
+                    xpos = self.csvCol[xyzCol[0]]
+                    ypos = self.csvCol[xyzCol[1]]
+                    zpos = self.csvCol[xyzCol[2]]
                     
                 elif i>0: # read data
                     valid = True
@@ -166,43 +233,134 @@ class xyzData:
                     
                     # row template with np.nan for missing data
                     rowData=[x,y,z]+[np.nan]*(self.maxCol-2)
-                    
+
                     for csv_col in self.csvCol:
-                        if csv_col not in ['x','y','z','id','date']:
-                            j = self.csvCol[csv_col] # column index
+                        if csv_col not in (xyzCol+['id',dateCol]):
+                            colIndex = self.csvCol[csv_col]
                             try:
-                                rowData[self.index[csv_col]]=float(row[j])
+                                rowData[self.index[csv_col]]=float(row[colIndex])
                             except:
+                                pass
+                        elif csv_col == dateCol:
+                            colIndex = self.csvCol[csv_col]
+                            try:
+                                if dateFormat == 'iso-8601':
+                                    # use np.datetime64 directly
+                                    rowData[self.index[csv_col]]=np.datetime64(row[colIndex].replace("/","-"))
+                                else:
+                                    # use datetime.strptime and dateFormat, replace / with -
+                                    rowTime = datetime.strptime(row[colIndex].replace("/","-"), dateFormat)
+                                    rowData[self.index[csv_col]] = np.datetime64(rowTime)
+                            except:
+                                # if dateCol is defined and not valid, line is invalid
+                                valid = False
                                 pass
 
                     if valid:
-                        self.pData.append(np.array(rowData))
+                        pDataArray.append(np.array(rowData))
+
                 i+=1
+                if not(limit==None):
+                    if i>=(limit):
+                        break
 
         if config.verbose:
             print (f"time: {time.time()-t0} seconds")
             print (f"{i} Lines, {self.maxCol+1} columns")
             print (f"invalid data in {k} lines")
             
-        self.pData = np.vstack(self.pData)
+        self.pData = np.vstack(pDataArray)
 
         self.current = self.pData
         self.bBox = array3D_BBox(self.current)
-            
+        
     # ~read(self, fileName)
+
+    def reset(self):
+        """
+        method to reset self.current to self.pData
+        """
+
+        if len(self.pData)>0:
+            self.current = self.pData
+            self.bBox = array3D_BBox(self.current)
+            self.maxCol = self.pData.shape[1]-1
+        else:
+            print (f'no data')
+            raise ValueError
+        
+    # ~reset(self)
+
+    def coordShift(self, dx=0.0, dy=0.0, dz=0.0):
+        """
+        method to shift x,y,z in self.current
+        
+        arguments:
+        -dx, dy, dz: float, shift x,y,z
+        """
+
+        self.current[:,0]+=dx
+        self.current[:,1]+=dy
+        self.current[:,2]+=dz
+        
+        self.bBox = array3D_BBox(self.current)
+
+    # ~coordShift(self, dx=0.0, dy=0.0, dz=0.0)
+
+    def fromMetric(self, zShift=0.0, xScale=0.3048, yScale=0.3048, zScale=0.3048):
+        """
+        method to convert z to metric
+        
+        arguments:
+        -xScale, yScale, zScale, zShift: float
+        """
+        
+        # shift first, then scale
+        self.current[:,2]=self.current[:,2]+zShift
+
+        self.current[:,0]*=xScale
+        self.current[:,1]*=yScale
+        self.current[:,2]*=zScale
+
+        self.bBox = array3D_BBox(self.current)
+
+    def fromArray(self, data, index=False):
+        """
+        method to create xyzData from np.array()
+        """
+
+        self.xyzCol = ['x','y','z']
+        self.index = {'x':0,'y':1,'z':2}
+
+        if isinstance(data, np.ndarray):
+
+            self.pData = data
+            self.current = self.pData
+            self.bBox = array3D_BBox(self.current)
+            
+        if index and isinstance(index, dict):
+            self.index.update(index)
+            self.maxCol = max(self.index.values())
+        else:
+            for i in range(3,self.pData.shape[1]):
+                self.index[f'col{i}']=i+1
+                
+    # ~fromArray(self, data, index=False)
 
     def filterIPR(self, p_IPR):
         """
         method to filter outliers using interpercentile range p_IPR = (0,50)
+        
+        arguments:
+        -p_IPR: float, interpercentile range (0,50)
         """
+        
         l0 = len(self.current)
         self.current = array3D_IPR(self.pData, p_IPR)
         self.bBox = array3D_BBox(self.current)
         
         if config.verbose:
             print (f"filterIPR ({p_IPR}%-{100-p_IPR}%) removed {l0-len(self.current)} lines")
-        
-        return self.current
         
     # ~filterIPR(self, p_IPR)
 
@@ -221,17 +379,16 @@ class xyzData:
             except:
                 print (f'{colStr} not in source index')
                 raise TypeError
-            
-        l0 = len(self.current)
-        self.current = self.current[np.isfinite(self.current[:,col])]
- 
-        if config.verbose: print (f"filterNaN '{colStr}' [{col}] removed {l0-len(self.current)} lines")
-
-        self.bBox = array3D_BBox(self.current)
-        return self.current
         
+        l0 = len(self.current)
+        self.current = self.current[np.invert(self.current[:,col]!=self.current[:,col])]
+        
+        if config.verbose: print (f"filterNaN [{colStr}] removed {l0-len(self.current)} lines")
+        
+        self.bBox = array3D_BBox(self.current)
+            
     # ~filterNaN(self):
-
+    
     def filterBBox(self, bBox, offset=0.0):
         """
         method to filter on a bounding box
@@ -251,6 +408,43 @@ class xyzData:
         return self.current
         
     # ~filterBBox(self):
+
+    def filterCol(self, col='x', minVal=False, maxVal=False):
+        """
+        method to filter on a column value inside minVal,maxVal
+        
+        arguments:
+        -col:       integer, index / string: key for self.index[]
+        -minVal:    float, minimum value
+        -maxVal:    float, maximum value
+        """
+
+        if isinstance(col,str):
+            try:
+                colStr=col
+                col=self.index[colStr]
+            except:
+                print(f"filterCol: '{colStr}' not found in self.index")
+                return
+            
+        l0 = len(self.current)
+        
+        if not(minVal is False):
+            self.current = self.current[(self.current[:,col]>=minVal)]
+        if not(maxVal is False):
+            self.current = self.current[(self.current[:,col]<=maxVal)]
+        
+        colStr=col # only for output
+        if config.verbose: print (f"filterCol '{colStr}',{minVal},{maxVal} removed {l0-len(self.current)} lines, " + \
+                                  f"now {len(self.current)}")
+
+        if len(self.current)==0:
+            print (f"filterCol '{col}' removed all lines")
+            raise ValueError
+
+        self.bBox = array3D_BBox(self.current)
+    
+    # ~filterCol(self, col='x', minVal=False, maxVal=False)
 
     def extractArrayN4(self, col):
         """

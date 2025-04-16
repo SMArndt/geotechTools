@@ -24,6 +24,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from matplotlib.widgets import Slider
 
 from stressUtils import rot_x, rot_y, rot_z
 from gridData import *
@@ -235,7 +236,7 @@ try:
 
     class plot3Dgeo:
 
-        def __init__(self, points: np.ndarray=None, stlMesh=None, var=3):
+        def __init__(self, points: np.ndarray=None, stlMesh=None, var=2, vmin=None, vmax=None, elev=12.5, azim=-22.5):
             """
             constructor for plot3D()
         
@@ -244,24 +245,27 @@ try:
 
             # https://matplotlib.org/stable/gallery/color/colormap_reference.html
             #usescientificcolourmaps suggested by https://www.linkedin.com/in/lindsey-smith-17665622a/
-            cmaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis'][2]
+            cmaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis', 'turbo', 'bwr'][-2]
 
             fig = plt.figure()
             ax = fig.add_subplot(projection='3d')
 
             plt_colours = points[:,var]
     
-            fax = ax.scatter(points[:,0],points[:,1],points[:,2], c=plt_colours , cmap=cmaps)
+            fax = ax.scatter(points[:,0],points[:,1],points[:,2], vmin=vmin, vmax=vmax, c=plt_colours , cmap=cmaps)
 
             if stlMesh:
-                your_mesh = stlMesh
-                ax.add_collection3d(mplot3d.art3d.Poly3DCollection(your_mesh.vectors))
+                #your_mesh = stlMesh
+                #ax.add_collection3d(mplot3d.art3d.Poly3DCollection(your_mesh.vectors))
+                poly3d = Poly3DCollection(stlMesh.vectors, alpha=0.1, facecolor='gray')
+                ax.add_collection3d(poly3d)
+
 
             ax.set_xlabel('X')
             ax.set_ylabel('Y')
             ax.set_zlabel('Z')
 
-            ax.view_init(elev=12.5, azim=-22.5) # updates ax.azim, ax.elev on close
+            ax.view_init(elev=elev, azim=azim) # updates ax.azim, ax.elev on close
 
             plt.colorbar(fax)
             plt.show()
