@@ -333,7 +333,7 @@ class xyzData:
         self.index = {'x':0,'y':1,'z':2}
 
         if isinstance(data, np.ndarray):
-
+            self.maxCol = data.shape[1]-1
             self.pData = data
             self.current = self.pData
             self.bBox = array3D_BBox(self.current)
