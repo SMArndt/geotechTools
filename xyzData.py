@@ -1,4 +1,4 @@
-"""
+﻿"""
 xyzData.py - Copyright 2025 S.M.Arndt, Cavroc Pty Ltd
 Visit https://cavroc.com/ for more information on IUCM and StopeX
 
@@ -269,9 +269,9 @@ class xyzData:
                         # remove leading spaces
                         csv_col = csv_col.lstrip()
                         # fix encoding issues with degree symbol often found in mXrap files and
-                        csv_col = csv_col.replace('°', '�')
-                        # remove '﻿' from UTF-8 BOM (Byte Order Mark) gone rogue
-                        csv_col = csv_col.replace('﻿', '')
+                        csv_col = csv_col.replace('Â°', '°')
+                        # remove 'ï»¿' from UTF-8 BOM (Byte Order Mark) gone rogue
+                        csv_col = csv_col.replace('ï»¿', '')
                         if rmCRLF:
                             # replace CRLF with space, remove double spaces
                             csv_col = csv_col.replace('\r\n', ' ').replace('  ', ' ')
