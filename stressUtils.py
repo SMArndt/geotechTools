@@ -1,3 +1,20 @@
+"""
+stressUtils.py - Copyright 2025 S.M.Arndt, Cavroc Pty Ltd
+Visit https://cavroc.com/ for more information on IUCM and StopeX
+
+This file is part of geotechTools (https://github.com/SMArndt/geotechTools).
+
+geotechTools is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software Foundation.
+
+geotechTools is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with geotechTools.
+If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import numpy as np
 import math
 
@@ -48,12 +65,12 @@ def getCartesianStress(Principals):
     """
     
     Cartesian = np.zeros((3,3))                      
-    for(value,plunge,trend) in Principals:
+    for(value,dip,trend) in Principals:
     
         T=np.array([[0,0,0],[0,value,0],[0,0,0]])
 
-        # rotation matrix R = Rz(-trend) * Rx(-plunge)
-        R = np.dot(rot_z(math.radians(-trend)), rot_x(math.radians(-plunge)))
+        # rotation matrix R = Rz(-trend) * Rx(-dip)
+        R = np.dot(rot_z(math.radians(-trend)), rot_x(math.radians(-dip)))
         # rotated tensor R * T * R.T
         T = np.dot(np.dot(R, T), R.T)
     

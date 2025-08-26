@@ -1,5 +1,5 @@
 """
-xyzData.py - Copyright 2024 S.M.Arndt, Cavroc Pty Ltd
+xyzData.py - Copyright 2025 S.M.Arndt, Cavroc Pty Ltd
 Visit https://cavroc.com/ for more information on IUCM and StopeX
 
 This file is part of geotechTools (https://github.com/SMArndt/geotechTools).
@@ -19,6 +19,7 @@ If not, see <https://www.gnu.org/licenses/>.
 # imports
 # ---------------------------------------------------------------------------
 
+from calendar import c
 import time
 from datetime import datetime
 import csv
@@ -51,6 +52,46 @@ def array3D_BBox(a):
 
 # ~def array3D_BBox(a)
 
+def array3D_BBox_ChatGPT(points):
+    """
+    Calculate the bounding box of a 3D array.
+
+    Parameters:
+    - points: NumPy array of points.
+
+    Returns:
+    - limits: Tuple of min and max limits for x, y, z axes.
+    """
+    min_vals = points.min(axis=0)
+    max_vals = points.max(axis=0)
+    return (min_vals, max_vals)
+
+def bBoxInside(bBoxOuter, bBoxInner):
+    """
+    Returns True if bBoxInner is completely inside bBoxOuter.
+
+    Parameters:
+    - bBoxOuter: tuple of ((xmin, ymin, zmin), (xmax, ymax, zmax))
+    - bBoxInner: tuple of ((xmin, ymin, zmin), (xmax, ymax, zmax))
+    """
+    for i in range(3):
+        if not (bBoxOuter[0][i] <= bBoxInner[0][i] and bBoxInner[1][i] <= bBoxOuter[1][i]):
+            return False
+    return True
+
+def roundBBox(bbox, digits=1):
+    """
+    Rounds all coordinates in a 3D bounding box to the specified number of decimal places.
+    
+    Parameters:
+        bbox (tuple): A tuple of two 3D coordinate tuples, e.g., ((x1, y1, z1), (x2, y2, z2))
+        digits (int): Number of decimal places to round to (default is 1)
+    
+    Returns:
+        tuple: A new bbox with rounded float values.
+    """
+    return tuple(tuple(round(coord, digits) for coord in point) for point in bbox)
+
 def array3D_IPR(a, p_IPR=25.0):
     """
     filter in interpercentile range of np.array() of shape (N, 3 or more)
@@ -75,6 +116,64 @@ def array3D_IPR(a, p_IPR=25.0):
         (a[:,2] > p_limits[2][0]) & (a[:,2] < p_limits[2][1]) )]
 
 # ~def array3D_IPR(a, p_IPR=25.0)
+
+def indicesMap(indices='xyz'):
+
+    mapStressStrain = {
+        'xyz': ['sxx', 'syy', 'szz', 'sxy', 'sxz', 'syz'],
+        '123': ['s11', 's22', 's33', 's12', 's13', 's23'],
+        'stress-Flac3D' : ['Sxx(MPa)','Syy(MPa)','Szz(MPa)','Sxy(MPa)','Sxz(MPa)','Syz(MPa)'],
+        'strain-Flac3D' : ['Exx(-)','Eyy(-)','Ezz(-)','Exy(-)','Exz(-)','Eyz(-)'],
+        'stress-xyz': ['sxx', 'syy', 'szz', 'sxy', 'sxz', 'syz'],
+        'stress-123': ['s11', 's22', 's33', 's12', 's13', 's23'],
+        'STRESS-xyz': ['SXX', 'SYY', 'SZZ', 'SXY', 'SXZ', 'SYZ'],
+        'STRESS-123': ['S11', 'S22', 'S33', 'S12', 'S13', 'S23'],
+        'strain-xyz': ['exx', 'eyy', 'ezz', 'exy', 'exz', 'eyz'],
+        'strain-123': ['e11', 'e22', 'e33', 'e12', 'e13', 'e23'],
+        'STRAIN-xyz': ['EXX', 'EYY', 'EZZ', 'EXY', 'EXZ', 'EYZ'],
+        'STRAIN-123': ['E11', 'E22', 'E33', 'E12', 'E13', 'E23'],
+        'PBT' : ['P-Axis Plunge (\u00b0)', 'P-Axis Trend (\u00b0)', 'B-Axis Plunge (\u00b0)', 'B-Axis Trend (\u00b0)',  \
+                 'T-Axis Plunge (\u00b0)', 'T-Axis Trend (\u00b0)']
+    }
+
+    if indices not in mapStressStrain.keys():
+        print(f"'{indices}' no association found for indices")
+        raise ValueError
+
+    return mapStressStrain.get(indices, [])
+
+# ~def indicesMap(indices='xyz')
+
+def calcRvalue(row):
+    """
+    calculate R value for row
+
+    arguments:
+    -row: list of the three principals, i.e (P,B,T)
+
+    returns: R value (float)
+    """
+
+    # list absolute values of the three principals, i.e (P,B,T)
+    abs_values = [abs(x) for x in row]
+
+    # maximum and minimum absolute value
+    max_abs = max(abs_values)
+    min_abs = min(abs_values)
+
+    # compare the middle value with the maximum absolute value
+    
+    if abs_values[1] == max_abs:
+        mid_abs = max(abs_values[0], abs_values[2])
+    elif abs_values[1] == min_abs:
+        mid_abs = min(abs_values[0], abs_values[2])
+    else:
+        mid_abs = abs_values[1]
+    
+    # divide difference between the max and mid by max and min values
+    return (max_abs - mid_abs) / (max_abs - min_abs)
+
+# ~def calcRvalue(row)
 
 # ---------------------------------------------------------------------------
 # class xyzData()
@@ -121,6 +220,8 @@ class xyzData:
         -dateCol:       string, column name for date
         -limit:         integer, limit number of lines
         -rmCRLF:        boolean, remove CRLF from csv file
+        
+        Note: Common dateFormats are '%d-%m-%Y' or '%Y-%m-%d %H:%M'
         """
 
         self.fileName = fileName
@@ -161,15 +262,27 @@ class xyzData:
                 if i==0: # headers
                     if config.verbose: print ("reading column headers ...")
 
+                    # remove leading spaces, fix encoding issues, remove UTF-8 BOM
+                    cleanRow = []
+                    for csv_col in row:
+
+                        # remove leading spaces
+                        csv_col = csv_col.lstrip()
+                        # fix encoding issues with degree symbol often found in mXrap files and
+                        csv_col = csv_col.replace('°', '�')
+                        # remove '﻿' from UTF-8 BOM (Byte Order Mark) gone rogue
+                        csv_col = csv_col.replace('﻿', '')
+                        if rmCRLF:
+                            # replace CRLF with space, remove double spaces
+                            csv_col = csv_col.replace('\r\n', ' ').replace('  ', ' ')
+
+                        cleanRow.append(csv_col)
+
+                    row = cleanRow
+
                     # listed headers, save currentCol in dictionary & update maxCol
                     currentCol=0
-                    for csv_col_head in row:
-                        if rmCRLF:
-                            # remove leading spaces, replace CRLF with space, remove double spaces
-                            csv_col = csv_col_head.lstrip().replace('\r\n', ' ').replace('  ', ' ')
-                        else:
-                            # remove leading spaces
-                            csv_col = csv_col_head.lstrip()
+                    for csv_col in row:
 
                         # lower case headers for 'x','y','z'
                         if csv_col in ['X','Y','Z']: csv_col=csv_col.lower()
@@ -192,14 +305,8 @@ class xyzData:
 
                     # unlisted headers, save currentCol in dictionary & update maxCol
                     currentCol=0                    
-                    for csv_col_head in row:
-                        if rmCRLF:
-                            # remove leading spaces, replace CRLF with space, remove double spaces
-                            csv_col = csv_col_head.lstrip().replace('\r\n', ' ').replace('  ', ' ')
-                        else:
-                            # remove leading spaces
-                            csv_col = csv_col_head.lstrip()
-                        
+                    for csv_col in row:
+
                         # lower case headers for 'x','y','z'
                         if csv_col in ['X','Y','Z']: csv_col=csv_col.lower()
 
@@ -231,32 +338,34 @@ class xyzData:
                         valid = False
                         k+=1
                     
-                    # row template with np.nan for missing data
-                    rowData=[x,y,z]+[np.nan]*(self.maxCol-2)
-
-                    for csv_col in self.csvCol:
-                        if csv_col not in (xyzCol+['id',dateCol]):
-                            colIndex = self.csvCol[csv_col]
-                            try:
-                                rowData[self.index[csv_col]]=float(row[colIndex])
-                            except:
-                                pass
-                        elif csv_col == dateCol:
-                            colIndex = self.csvCol[csv_col]
-                            try:
-                                if dateFormat == 'iso-8601':
-                                    # use np.datetime64 directly
-                                    rowData[self.index[csv_col]]=np.datetime64(row[colIndex].replace("/","-"))
-                                else:
-                                    # use datetime.strptime and dateFormat, replace / with -
-                                    rowTime = datetime.strptime(row[colIndex].replace("/","-"), dateFormat)
-                                    rowData[self.index[csv_col]] = np.datetime64(rowTime)
-                            except:
-                                # if dateCol is defined and not valid, line is invalid
-                                valid = False
-                                pass
-
                     if valid:
+
+                        # row template with np.nan for missing data
+                        rowData=[x,y,z]+[np.nan]*(self.maxCol-2)
+
+                        for csv_col in self.csvCol:
+                            if csv_col not in (xyzCol+['id',dateCol]):
+                                colIndex = self.csvCol[csv_col]
+                                try:
+                                    rowData[self.index[csv_col]]=float(row[colIndex])
+                                except:
+                                    pass
+                            elif csv_col == dateCol:
+                                colIndex = self.csvCol[csv_col]
+                                try:
+                                    if dateFormat == 'iso-8601':
+                                        # use np.datetime64 directly
+                                        rowData[self.index[csv_col]]=np.datetime64(row[colIndex].replace("/","-"))
+                                    else:
+                                        # use datetime.strptime and dateFormat, replace / with -
+                                        rowTime = datetime.strptime(row[colIndex].replace("/","-"), dateFormat)
+                                        rowData[self.index[csv_col]] = np.datetime64(rowTime)
+                                except:
+                                    # if dateCol is defined and not valid, line is invalid
+                                    valid = False
+                                    k+=1
+                                    pass
+
                         pDataArray.append(np.array(rowData))
 
                 i+=1
@@ -273,7 +382,7 @@ class xyzData:
 
         self.current = self.pData
         self.bBox = array3D_BBox(self.current)
-        
+
     # ~read(self, fileName)
 
     def reset(self):
@@ -307,6 +416,28 @@ class xyzData:
 
     # ~coordShift(self, dx=0.0, dy=0.0, dz=0.0)
 
+    def fromImperial(self, zShift=0.0, xScale=0.3048, yScale=0.3048, zScale=0.3048, site=False):
+        """
+        Convert coordinates from imperial to metric. Z is shifted then scaled.
+    
+        Arguments:
+        - zShift: float, shift applied to Z before scaling
+        - xScale, yScale, zScale: float, scale factors (default 0.3048 for [ft]] to [m])
+        - site: string, optional site name, site specific transformations
+        """
+
+        match site:
+            case _:  # no transformations
+                self.current[:, 2] = self.current[:, 2] + zShift
+
+        # Apply scaling to all axes
+        self.current[:, 0] *= xScale
+        self.current[:, 1] *= yScale
+        self.current[:, 2] *= zScale
+
+        # Update bounding box
+        self.bBox = array3D_BBox(self.current)
+
     def fromMetric(self, zShift=0.0, xScale=0.3048, yScale=0.3048, zScale=0.3048):
         """
         method to convert z to metric
@@ -316,7 +447,6 @@ class xyzData:
         """
         
         # shift first, then scale
-        self.current[:,2]=self.current[:,2]+zShift
 
         self.current[:,0]*=xScale
         self.current[:,1]*=yScale
@@ -389,10 +519,42 @@ class xyzData:
             
     # ~filterNaN(self):
     
+    def filterTimeRange(self, startDT='1970-01-01 00:00:00.000', endDT='2100-01-01 00:00:00.000'):
+        """
+        method to filter on a datetime range (not date range!)
+        
+        arguments:
+        -startDT: string, format 'YYYY-MM-DD HH:MM:SS.sss'
+        -endDT:   string, format 'YYYY-MM-DD HH:MM:SS.sss'
+        """
+        
+        # note if startDT or endDT are in the format 'YYYY-MM-DD' datetime becomes a date
+        # object, not a datetime, and comparison (<,>,=) fails
+        
+        if self.dateCol:
+            dateIndex = self.index[self.dateCol]
+
+            l0 = len(self.current)
+            self.current = self.current[(self.current[:,dateIndex]>=np.datetime64(startDT)) & \
+                                        (self.current[:,dateIndex]<=np.datetime64(endDT))]
+        else:
+            print (f"no date column")
+            raise ValueError
+
+        if config.verbose: print (f"filterDateRange {startDT} to {endDT} removed {l0-len(self.current)} lines")
+
+        self.bBox = array3D_BBox(self.current)
+    
+    # ~filterTimeRange(self, startDT, endDT)
+
     def filterBBox(self, bBox, offset=0.0):
         """
         method to filter on a bounding box
+        
+        arguments:
+        -bBox: tuple ((x0,y0,z0),(x1,y1,z1))
         """
+        
         ((x0,y0,z0),(x1,y1,z1)) = (bBox[0][0]-offset,bBox[0][1]-offset,bBox[0][2]-offset), \
                                   (bBox[1][0]+offset,bBox[1][1]+offset,bBox[1][2]+offset) 
         
@@ -405,7 +567,6 @@ class xyzData:
         if config.verbose: print (f"filterBBox {bBox} offset {offset} removed {l0-len(self.current)} lines")
             
         self.bBox = array3D_BBox(self.current)
-        return self.current
         
     # ~filterBBox(self):
 
@@ -451,7 +612,9 @@ class xyzData:
         method to extract np.array() of shape (N, 4)
         
         arguments:
-        -col integer: index / string: key for self.index[]
+        -col:       integer, index / string: key for self.index[]
+        
+        returns: np.array()
         """
 
         if isinstance(col,str):
@@ -466,23 +629,36 @@ class xyzData:
     
     # ~extractArrayN4(self, col)
 
-    def extractStress(self, indices='default', xyz=False):
+    def extractStress(self, indices='xyz', xyz=False):
+        """
+        deprecated, use extractTensor() instead
+        """
+        print("--- extractStress: deprecated method, use extractTensor() instead!")
+
+        return self.extractTensor(indices, xyz)
+
+    # ~extractStress()
+
+    def extractTensor(self, indices='xyz', xyz=False):
         """
         method to extract np.array() of shape (N, 6) or (N, 9) if xyz=True
         
         arguments:
-        -indices:       stress column notation
-        -xyz boolean:   True if xyz stress components are in array[0:2]
+        -indices:   string, stress column notation, 'xyz' or '123'
+        -xyz:       boolean, True if xyz stress components are in array[0:2]
+        
+        returns: np.array()
         """
-        
-        if indices=='default' or indices=='xyz':
-            col=['sxx','syy', 'szz', 'sxy','sxz', 'syz']
-        if indices=='123':
-            col=['s11','s22', 's33', 's12','s13', 's23']
-        
+
+        if indices == 'PBT':
+            print ("Warning: extractTensor 'PBT' is not a tensor, returns trend/plunge (6 components)")
+
+        colNames = indicesMap(indices)
+        col = [None] * 6
+
         for i in range(6):
             try:
-                col[i]=self.index[col[i]]
+                col[i]=self.index[colNames[i]]
             except:
                 print(f"extractStress: '{col[i]}' not found in self.index")
                 return
@@ -493,21 +669,157 @@ class xyzData:
         else:
             return np.hstack([self.current[:,col[i]].reshape(-1, 1) for i in range(6)])
 
-    # ~extractStress()
+    # ~extractTensor()
 
-    def mapData(self, source, newIndex='mapData-1', overwrite=True, maxDist=False, fill=np.nan):
+    def extractPBT(self, colNames=False):
+        """
+        method to extract np.array() of shape (N, 9) for columns P,B,T
+        
+        arguments:
+        -colNames
+        
+        returns: np.array()
+        """
+
+        # default column names for P,B,T
+        if not colNames:
+            colNames = ['P-Axis scale', 'P-Axis Trend (o)', 'P-Axis Plunge (o)', \
+                        'B-Axis scale', 'B-Axis Trend (o)', 'B-Axis Plunge (o)', \
+                        'T-Axis scale', 'T-Axis Trend (o)', 'T-Axis Plunge (o)']
+        col = [None] * 9
+
+        for i in range(9):
+            try:
+                print(colNames[i])
+                col[i]=self.index[colNames[i]]
+            except:
+                print(f"extractPBT: '{col[i]}' not found in self.index")
+                return
+
+        return np.hstack([self.current[:,col[i]].reshape(-1, 1) for i in range(9)])
+
+    # ~extractPBT()
+
+    def addPrincipals(self, indices, prefix, dipDir=True, normals=True):
+        """
+        add principal values from tensor (six components) to self.current
+
+        optional:
+        - add dip, dipDir for each principal component to self.current
+        - add normals for each principal component to self.current
+        """
+
+        # extractTensor returns np.array() of shape (N, 6)
+        tArray = self.extractTensor(indices=indices, xyz=False)
+
+        prinList, dipsList, vectList = [], [], [] # containers (lists) of length tArray
+
+        for i in range(len(tArray)):
+            # get full tensor
+            T=unpackStress(tArray[i])
+
+            # prinList[] - principal stresses from (eigenvalues, eigenvectors)
+            sp, ev = getPrincipalStress(T)
+            prinList.append(sp)
+
+            # dipsList[] - plunge and trend for each principal stress
+            dip_dipDir = getStressOrientation(ev)
+            dipsList.append(dip_dipDir)
+
+            if normals:
+                # get normal vectors for each dip and direction
+                vectList.append(getNormals(dip_dipDir))
+
+        # ---------------------------------------------------------------------------
+        # update self.current: principals, optional orientation(Dip/DipDir) & normals
+        # ---------------------------------------------------------------------------
+
+        # prefix + 1,2,3,Dip1,DipDir1,Dip2,DipDir2,Dip3,DipDir3,N1x,N1y,N1z,N2x,N2y,N2z,N3x,N3y,N3z
+
+        if prefix:
+            i = self.maxCol
+            indexNew = {prefix+'1' : i+1, prefix+'2' : i+2, prefix+'3' : i+3}
+
+            self.index.update(indexNew)
+            self.maxCol+=3
+            self.current = np.hstack([self.current, np.array(prinList)])
+
+        if prefix and dipDir:
+            i = self.maxCol
+            indexNew.update({prefix+'Dip1' : i+1, prefix+'DipDir1' : i+2, \
+                             prefix+'Dip2' : i+3, prefix+'DipDir2' : i+4, \
+                             prefix+'Dip3' : i+5, prefix+'DipDir3' : i+6})
+
+            self.index.update(indexNew)
+            self.maxCol+=6
+            self.current = np.hstack([self.current, np.array(dipsList).reshape((len(tArray),-1))])
+
+        if prefix and normals:
+            i = self.maxCol
+            indexNew.update({prefix+'N1x' : i+1, prefix+'N1y' : i+2, prefix+'N1z' : i+3, \
+                             prefix+'N2x' : i+4, prefix+'N2y' : i+5, prefix+'N2z' : i+6, \
+                             prefix+'N3x' : i+7, prefix+'N3y' : i+8, prefix+'N3z' : i+9})
+
+            self.index.update(indexNew)
+            self.maxCol+=9
+            self.current = np.hstack([self.current, np.array(vectList).reshape((len(tArray),-1))])
+
+        # ~def addPrincipals(self, indices, prefix, dipDir=True, normals=True)
+
+    def addNormals(self, prefix, indices='PBT'):
+        """
+        add normals for each plunge and trend in indices [trend1,plunge1,...]
+        (uses extractTensor to get 6 components although not a tensor)
+
+        arguments:
+        -prefix: string, prefix for new columns
+        -indices: string indicesMap() for column names
+        """
+
+        tArray = self.extractTensor(indices=indices, xyz=False)
+        # dipsList = [[plunge1,trend1],...]
+        dipsList = tArray.reshape(len(tArray), 3, 2)
+        print (dipsList.shape)
+        vectList = []
+
+        for dip_dipDir in dipsList:
+
+            # get normal vectors for each dip and direction
+            vectList.append(getNormals(dip_dipDir))
+
+        # ------------------------------------------------------------------------------
+        # update self.current with normals, prefix + N1x,N1y,N1z,N2x,N2y,N2z,N3x,N3y,N3z
+
+        i = self.maxCol
+        indexNew = {prefix+'N1x' : i+1, prefix+'N1y' : i+2, prefix+'N1z' : i+3, \
+                    prefix+'N2x' : i+4, prefix+'N2y' : i+5, prefix+'N2z' : i+6, \
+                    prefix+'N3x' : i+7, prefix+'N3y' : i+8, prefix+'N3z' : i+9}
+
+        self.index.update(indexNew)
+        self.maxCol+=9
+        self.current = np.hstack([self.current, np.array(vectList).reshape((len(tArray),-1))])
+
+        # ~def addNormals(self, indices, prefix)
+
+    def mapData(self, source, newIndex='mapData-1', overwrite=True, maxDist=False, \
+                selectStep = False, fill=np.nan):
         """
         method to map data from source to self using kdTree
         - one column from np.array of shape (N, 4) into newIndex
         - all columns from xyzData class object with new indices from source.index
+        - if selectStep is set, only map data for selectStep with stepCol in source
         """
-        
+
         # source data
         # -----------
         if isinstance(source,np.ndarray):
             sourceData = source
+            print (f"sourceData array: {sourceData.shape}")
         elif isinstance(source,xyzData):
             sourceData = source.current
+            if self.stepCol:
+                stepCol = self.index[self.stepCol]
+            print (f"sourceData xyzData: {sourceData.shape}")
         else:
             return
         
@@ -517,8 +829,13 @@ class xyzData:
         
         # kdTree
         # ------
+        t0 = time.time()
+
         kdtree=KDTree(sourceData[:,0:3])
         dist,points=kdtree.query(targetData[:,0:3],1) # for ,2: points[i] becomes list
+
+        if config.verbose:
+            print (f"kdTree time mapping {source}: {time.time()-t0} seconds")
 
         if isinstance(source,np.ndarray): # map one column only
 
@@ -529,35 +846,222 @@ class xyzData:
                 self.index[newIndex]=targetCol
                 overwrite=True
             if overwrite:
-                # create new column with zeros
-                targetData = np.hstack([targetData,np.zeros([len(targetData),1])])
+                # create new column with np.nan
+                targetData = np.hstack([targetData,np.full([len(targetData),1],np.nan)])
     
                 for i in range(len(points)):
                     if (maxDist is False) or (dist[i]<=maxDist):
                         targetData[i,targetCol]=sourceData[points[i],3]
                     else:
                         targetData[i,targetCol]=fill
+                        
+        # issue: check if overwrite works correctly
 
         elif isinstance(source,xyzData): # map all columns
 
-            # create new columns with zeros     
+            selfKeys = self.index.keys() # list of keys in self.index before mapping
+
+            # create new columns with np.nan for each column in source
             for col in source.index.keys():
-                if col not in self.index.keys():
+                # check if column exists in self, otherwise add new column with np.nan, 
+                # skip x,y,z if naming is different to source (i.e. 'Easting','Northing','Elevation')
+                if (col not in self.index.keys()) and (col not in source.xyzCol):
                     self.maxCol+=1
                     self.index[col]=self.maxCol
-                    targetData = np.hstack([targetData,np.zeros([len(targetData),1])])
+
+                    #adding new column with np.nan
+                    targetData = np.hstack([targetData,np.full([len(targetData),1],np.nan)])
+
             # map data
-            for i in range(len(points)):    
-                for col in source.index.keys():
-                    if col not in ['x','y','z']:
-                        if (col not in self.index.keys()) or overwrite:
-                            if (maxDist is False) or (dist[i]<=maxDist):
-                                targetData[i,self.index[col]]=sourceData[points[i],source.index[col]]
-                            else:
-                                targetData[i,self.index[col]]=fill  
+            for i in range(len(points)):
+
+                # selective fill based on step
+                if not(selectStep) or (targetData[i,stepCol]==selectStep):
+
+                    # each column from source data to be mapped to self
+                    for col in source.index.keys():
+
+                        # skip x,y,z columns in source.xyzCol
+                        if col not in source.xyzCol:
+
+                            # don't overwrite if column exists in self unless flag is set
+                            if (col not in selfKeys) or overwrite:
+                                if (maxDist is False) or (dist[i]<=maxDist):
+                                    targetData[i,self.index[col]]=sourceData[points[i],source.index[col]]
+                                else:
+                                    targetData[i,self.index[col]]=fill  
+
         else:
             return
 
+        if config.verbose:
+            print (f"mapData time: {time.time()-t0} seconds")
+
         self.current = targetData
+        self.bBox = array3D_BBox(self.current)
 
     # ~def mapData(self, source, newIndex='mapData-1')
+    
+    def associateSteps(self, seqFile=None, headers=['Start','Step'], newIndex='Step', overwrite=True):
+        """
+        method to associate time steps to self.current
+        
+        arguments:
+        -seqFile: string, csv file name
+        """
+
+        endOfTime = np.datetime64('2100-01-01 00:00:00.000')
+        optN = 0 # mark range to cycle_list
+        
+        if seqFile:
+            self.seqFile = seqFile
+        else:
+            print (f"no sequence file")
+            return
+        
+        seqData = pd.read_csv(seqFile)
+        seqData.dropna(how='all', inplace=True)
+        
+        # test if self.current has date column
+        
+        if self.dateCol:
+            dateIndex = self.index[self.dateCol]
+        else:
+            print (f"no date column")
+            return
+        if not((headers[0] in seqData) and (headers[1] in seqData)):
+            print (f"no Start or Step column in {seqFile}")
+            return
+        
+        self.filterNaN(self.dateCol)
+        
+        # create new column for steps in self.current if required
+    
+        if newIndex in self.index.keys():
+            if overwrite:
+                targetCol = self.index[newIndex]
+            else:
+                print (f"{newIndex} exists and overwrite==False")
+                return
+        else:
+            self.maxCol += 1
+            targetCol = self.maxCol
+            self.index[newIndex]=targetCol
+            self.current = np.hstack([self.current,np.zeros([len(self.current),1])])
+
+        self.stepCol = newIndex
+
+        # create list of dates plus 'endOfTime' to avoid repeat lookup
+        
+        dateList = np.append(np.array(list(seqData[headers[0]])[:],dtype='datetime64'),endOfTime)
+        
+        for n in range(len(seqData)):
+
+            if (dateList[n] >= dateList[n+1]):
+                print (f"Start dates in {seqFile} not in ascending order (line {n+3})")
+                raise ValueError
+
+        for n in range(len(seqData)-1):
+
+            if seqData[headers[1]][n] >= seqData[headers[1]][n+1]:
+                print (f"Steps in {seqFile} not in ascending order (line {n+3})")
+                raise ValueError
+            if seqData[headers[1]][n+1]-seqData[headers[1]][n]!=1:
+                print (f"Warning: Step {n+2} missing in {seqFile} (line {n+3})")
+
+        # loop over dates in self.current and associate steps from seqData
+        t0 = time.time()
+
+        for j in range(len(self.current[:,dateIndex])):
+
+            if config.verbose:
+                if (j % config.nHeartbeat == 0):
+                    print (f"associateSteps: processing line {j} time {time.time()-t0} optN {optN}")
+
+            # cyclic shift list of dates in seqData to use most recent first
+            # --------------------------------------------------------------
+            optRange = list(range(len(seqData))[optN:]) + list(range(len(seqData))[:optN])
+
+            for n in optRange:
+
+                if (dateList[n] <= self.current[j,dateIndex] < dateList[n+1]):
+                    self.current[j,targetCol]=seqData[headers[1]][n]
+                    optN = n
+                    break
+                
+        # store current data in pData to keep Step column on reset
+
+        self.pData = self.current
+
+    # ~def associateSteps(self, seqFile=None, headers=['Start','Step'], newIndex='Step', overwrite=True)
+
+    def uniqueSteps(self):
+        """
+        method to return unique steps in self.current
+        
+        returns: np.array()
+        """
+
+        if self.stepCol:
+            stepCol = self.index[self.stepCol]
+        else:
+            print (f"no step column")
+            return
+
+        return np.unique(self.current[:,stepCol])
+
+    def sortedArray(self, col='x', reverse=False):
+        """
+        method to sort self.current based on col
+            
+        arguments:
+        -col:       integer, index / string: key for self.index[]
+        -reverse:   boolean, True for descending order
+        """
+        # sort based on column index or string key
+        # this code 100% written by GitHub Co-pilot
+        # ----------------------------------------
+
+        if isinstance(col,str):
+            try:
+                colStr=col
+                col=self.index[colStr]
+            except:
+                print(f"sortedArray: '{colStr}' not found in self.index")
+                return
+        elif isinstance(col,int):
+            if col>self.maxCol:
+                print(f"sortedArray: col {col} not in self.current")
+                return
+        else:
+            print(f"sortedArray: no valid col argument")
+            return
+
+        self.current = self.current[self.current[:,col].argsort()]
+        if reverse:
+            self.current = self.current[::-1]
+                
+        self.bBox = array3D_BBox(self.current)
+
+        # ~def sortedArray(self, col='x', reverse=False)
+
+    def addRValue(self, indices, newColumn='R-Value'):
+        """
+        method to add R value to self.current - see calcRvalue()
+
+        arguments:
+        -indices: list of three column names (i.e. 'P/B/T-Axis scale' or 'S1/2/3')
+        """
+
+        rColumn = np.zeros((self.current.shape[0], 1))
+
+        for i in range(self.current.shape[0]):
+
+            row = [self.current[i][self.index[x]] for x in indices ]
+            rColumn[i] = calcRvalue(row)
+
+        self.current = np.hstack([self.current, rColumn])
+
+        indexNew = {newColumn : self.maxCol+1}
+        self.index.update(indexNew)
+        self.maxCol+=1
